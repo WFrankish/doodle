@@ -1,14 +1,38 @@
 const fs = require('fs');
 const http = require('http');
 
+function load(file) {
+  return new Promise((resolve, reject) => {
+    fs.readFile(file, (err, data) => {
+      err ? reject(err) : resolve(data);
+    });
+  });
+}
+
+const drawings = new Map;
 class Drawing {
-  constructor() {
+  constructor(id) {
+    this.loadPromise = null;
+    this.id = id;
     this.image = null;
     this.edits = [];
     // logicalTime advances by 1 for each edit.
     this.logicalTime = 0;
     // Callbacks awaiting writes.
     this.waiters = [];
+    this.lastSave = 0;  // Logical time of last save.
+    this.runTimer = setInterval(() => this.run(), 30000);
+  }
+  async run() {
+    console.log('Running cleanup for ' + this.id + '.');
+    // Dismiss all waiters. They will receive no updates. This prevents us from
+    // accumulating waiters forever when nobody is drawing anything.
+    for (const waiter of this.waiters) setInterval(waiter, 0);
+    // Save the file contents.
+    if (this.lastSave != this.logicalTime) {
+      this.lastSave = this.logicalTime;
+      await this.save();
+    }
   }
   snapshotTime() { return this.logicalTime - this.edits.length }
   apply(edits) {
@@ -34,23 +58,53 @@ class Drawing {
     const start = this.edits.length - amount;
     return this.edits.slice(start);
   }
-  snapshot(logicalTime, value) {
+  async snapshot(logicalTime, value) {
     if (this.snapshotTime() < logicalTime) {
       this.image = value;
       this.edits.splice(0, logicalTime - this.snapshotTime());
     }
+    await this.save();
   }
-}
-
-const drawings = new Map;
-
-function load(file) {
-  return new Promise((resolve, reject) => {
-    fs.readFile(file, (err, data) => {
-      if (err) reject(err);
-      resolve(data);
+  save() {
+    return new Promise((resolve, reject) => {
+      const name = 'images/' + this.id + '.json';
+      const data = {
+        image: this.image,
+        logicalTime: this.logicalTime,
+        edits: this.edits,
+      };
+      console.log('Writing ' + name);
+      fs.writeFile(name, JSON.stringify(data), 'utf8', error => {
+        error ? reject(error) : resolve();
+      });
     });
-  });
+  }
+  static async load(id) {
+    if (drawings.has(id)) {
+      const drawing = drawings.get(id);
+      if (drawing.loadPromise) await drawing.loadPromise;
+      return drawing;
+    }
+    const drawing = new Drawing(id);
+    drawings.set(id, drawing);
+    drawing.loadPromise = new Promise(async (resolve, reject) => {
+      let data;
+      try {
+        const name = 'images/' + id + '.json';
+        data = JSON.parse(await load(name));
+        console.log('Reading ' + name);
+        drawing.image = data.image;
+        drawing.logicalTime = data.logicalTime;
+        drawing.edits = data.edits;
+      } catch (error) {
+        console.log('Could not load ' + id + ': assuming it is new.');
+      }
+      drawing.loadPromise = null;
+      resolve();
+    });
+    await drawing.loadPromise;
+    return drawing;
+  }
 }
 
 function respond(response, code, contentType, data) {
@@ -67,36 +121,31 @@ function error(response, message) {
   respond(response, 404, 'text/plain', message);
 }
 
-function get(id) {
-  if (!drawings.has(id)) {
-    drawings.set(id, new Drawing);
-  }
-  return drawings.get(id);
-}
+async function get(id) { return await Drawing.load(id); }
 
 async function commit(id, data, response) {
   const {logicalTime, imageData} = JSON.parse(data);
-  const drawing = get(id);
-  drawing.snapshot(logicalTime, imageData);
+  const drawing = await get(id);
+  await drawing.snapshot(logicalTime, imageData);
   serve(response, 'text/plain', 'You betcha buddy.');
 }
 
 async function draw(id, data, response) {
   const edits = JSON.parse(data);
-  const drawing = get(id);
+  const drawing = await get(id);
   const logicalTime = drawing.apply(edits);
   serve(response, 'application/json', JSON.stringify({logicalTime}));
 }
 
 async function read(id, data, response) {
   const {from} = JSON.parse(data);
-  const drawing = get(id);
+  const drawing = await get(id);
   const result = await drawing.updates(from);
   return serve(response, 'application/json', JSON.stringify(result));
 }
 
 async function snapshot(id, data, response) {
-  const drawing = get(id);
+  const drawing = await get(id);
   if (drawing.image) {
     const result = {
       logicalTime: drawing.snapshotTime(),
