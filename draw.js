@@ -11,6 +11,21 @@ committedCanvas.height = height;
 overlayCanvas.width = width;
 overlayCanvas.height = height;
 
+function setCanvas(canvas, dimensions) {
+  canvas.style.top = dimensions.top + 'px';
+  canvas.style.left = dimensions.left + 'px';
+  canvas.style.width = dimensions.width + 'px';
+  canvas.style.height = dimensions.height + 'px';
+}
+
+const display = {top: 0, left: 0};
+function setDisplay(dimensions) {
+  display.top = dimensions.top;
+  display.left = dimensions.left;
+  setCanvas(committedCanvas, dimensions);
+  setCanvas(overlayCanvas, dimensions);
+}
+
 // Resize the display dimensions of the canvas whenever the window changes size.
 function resize() {
   const aspect = width / height;
@@ -18,17 +33,21 @@ function resize() {
   if (aspect < actualAspect) {
     console.log('wide')
     scale = innerHeight / height;
-    committedCanvas.style.width = innerHeight * aspect + 'px';
-    committedCanvas.style.height = innerHeight + 'px';
-    overlayCanvas.style.width = innerHeight * aspect + 'px';
-    overlayCanvas.style.height = innerHeight + 'px';
+    setDisplay({
+      top: 0,
+      left: 0.5 * (innerWidth - innerHeight * aspect),
+      width: innerHeight * aspect,
+      height: innerHeight,
+    });
   } else {
     console.log('narrow');
     scale = innerWidth / width;
-    committedCanvas.style.width = innerWidth + 'px';
-    committedCanvas.style.height = innerWidth / aspect + 'px';
-    overlayCanvas.style.width = innerWidth + 'px';
-    overlayCanvas.style.height = innerWidth / aspect + 'px';
+    setDisplay({
+      top: 0.5 * (innerHeight - innerWidth / aspect),
+      left: 0,
+      width: innerWidth,
+      height: innerWidth / aspect,
+    });
   }
 }
 resize();
@@ -65,8 +84,8 @@ let held = false;
 let pendingEdits = [];  // Edits which have been sent but not received.
 let newEdits = [];  // Edits which have not been sent.
 let position = [0, 0];
-addEventListener('mousedown', event => {
-  position = [event.x / scale, event.y / scale];
+function down(x, y) {
+  position = [(x - display.left) / scale, (y - display.top) / scale];
   held = true;
   newEdits.push({
     from: [position[0] - 0.1, position[1]],
@@ -74,15 +93,36 @@ addEventListener('mousedown', event => {
     color,
     size,
   });
-});
-addEventListener('mouseup', event => held = false);
-addEventListener('mouseleave', event => held = false);
-addEventListener('mousemove', event => {
-  const newPosition = [event.x / scale, event.y / scale];
+}
+function move(x, y) {
+  const newPosition = [(x - display.left) / scale, (y - display.top) / scale];
   if (held) {
     newEdits.push({from: position, to: newPosition, color, size});
   }
   position = newPosition;
+}
+addEventListener('mousedown', event => down(event.x, event.y));
+addEventListener('mouseup', event => held = false);
+addEventListener('mouseleave', event => held = false);
+addEventListener('mousemove', event => move(event.x, event.y));
+
+addEventListener('touchstart', event => {
+  event.preventDefault();
+  if (event.touches.length != 1) return;
+  const touch = event.touches[0];
+  down(touch.pageX, touch.pageY);
+});
+addEventListener('touchend', event => {
+  if (event.touches.length == 0) held = false;
+});
+addEventListener('touchcancel', event => {
+  if (event.touches.length == 0) held = false;
+});
+addEventListener('touchmove', event => {
+  event.preventDefault();
+  if (event.touches.length != 1) return;
+  const touch = event.touches[0];
+  move(touch.pageX, touch.pageY);
 });
 
 // Code for delivering edits.
