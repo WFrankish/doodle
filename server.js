@@ -41,7 +41,7 @@ class Drawing {
     console.log('Running cleanup for ' + this.id + '.');
     // Dismiss all waiters. They will receive no updates. This prevents us from
     // accumulating waiters forever when nobody is drawing anything.
-    for (const waiter of this.waiters) setInterval(waiter, 0);
+    for (const waiter of this.waiters) setTimeout(waiter, 0);
     this.waiters = [];
     // Save the file contents.
     await this.save();
@@ -63,7 +63,7 @@ class Drawing {
     this.edits.push(...edits);
     this.logicalTime += edits.length;
     // Notify any waiters.
-    for (const waiter of this.waiters) setInterval(waiter, 0);
+    for (const waiter of this.waiters) setTimeout(waiter, 0);
     this.waiters = [];
     return this.logicalTime;
   }
