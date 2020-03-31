@@ -9,34 +9,57 @@ function load(file) {
   });
 }
 
+function save(file, data) {
+  return new Promise((resolve, reject) => {
+    fs.writeFile(file, data, 'utf8', err => {
+      err ? reject(err) : resolve();
+    });
+  });
+}
+
 const drawings = new Map;
+// Period at which we run cleanup work for the drawing. This includes culling
+// open connections and saving the contents.
+const runPeriod = 30 * 1000;
+// Period of inactivity after which we drop the drawing from memory.
+const cleanupDelay = 5 * 60 * 1000;
 class Drawing {
   constructor(id) {
     this.loadPromise = null;
     this.id = id;
     this.image = null;
+    this.lastAccess = Date.now();
     this.edits = [];
     // logicalTime advances by 1 for each edit.
     this.logicalTime = 0;
     // Callbacks awaiting writes.
     this.waiters = [];
     this.lastSave = 0;  // Logical time of last save.
-    this.runTimer = setInterval(() => this.run(), 30000);
+    this.runTimer = setInterval(() => this.run(), runPeriod);
   }
   async run() {
     console.log('Running cleanup for ' + this.id + '.');
     // Dismiss all waiters. They will receive no updates. This prevents us from
     // accumulating waiters forever when nobody is drawing anything.
     for (const waiter of this.waiters) setInterval(waiter, 0);
+    this.waiters = [];
     // Save the file contents.
-    if (this.lastSave != this.logicalTime) {
-      this.lastSave = this.logicalTime;
-      await this.save();
+    await this.save();
+    const lastAccess = this.lastAccess;
+    if (Date.now() - lastAccess > cleanupDelay) {
+      const name = 'images/' + this.id + '.json';
+      // Only shut the file if it still hasn't been touched after saving.
+      if (lastAccess == this.lastAccess) {
+        clearInterval(this.runTimer);
+        console.log('Closing ' + name);
+        drawings.delete(this.id);
+      }
     }
   }
   snapshotTime() { return this.logicalTime - this.edits.length }
   apply(edits) {
     if (edits.length == 0) throw new Error('Must append at least one thing.');
+    this.lastAccess = Date.now();
     this.edits.push(...edits);
     this.logicalTime += edits.length;
     // Notify any waiters.
@@ -50,6 +73,7 @@ class Drawing {
     });
   }
   async updates(logicalTime) {
+    this.lastAccess = Date.now();
     if (logicalTime < this.snapshotTime()) {
       throw new Error("Cannot deliver updates before the snapshot.");
     }
@@ -65,19 +89,18 @@ class Drawing {
     }
     await this.save();
   }
-  save() {
-    return new Promise((resolve, reject) => {
-      const name = 'images/' + this.id + '.json';
-      const data = {
-        image: this.image,
-        logicalTime: this.logicalTime,
-        edits: this.edits,
-      };
-      console.log('Writing ' + name);
-      fs.writeFile(name, JSON.stringify(data), 'utf8', error => {
-        error ? reject(error) : resolve();
-      });
-    });
+  async save() {
+    if (this.logicalTime == this.lastSave) return;
+    const lastSave = this.logicalTime;
+    const name = 'images/' + this.id + '.json';
+    const data = {
+      image: this.image,
+      logicalTime: this.logicalTime,
+      edits: this.edits,
+    };
+    console.log('Writing ' + name);
+    await save(name, JSON.stringify(data));
+    this.lastSave = lastSave;
   }
   static async load(id) {
     if (drawings.has(id)) {
@@ -96,6 +119,7 @@ class Drawing {
         drawing.image = data.image;
         drawing.logicalTime = data.logicalTime;
         drawing.edits = data.edits;
+        drawing.lastSave = drawing.logicalTime;
       } catch (error) {
         console.log('Could not load ' + id + ': assuming it is new.');
       }
