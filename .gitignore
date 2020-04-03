@@ -2,3 +2,4 @@
 !.gitignore
 /images
 *.js.map
+/node_modules/*

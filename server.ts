@@ -1,7 +1,7 @@
 import fs = require('fs');
 import http = require('http');
 
-function load(file) {
+function load(file) : Promise<Buffer> {
   return new Promise((resolve, reject) => {
     fs.readFile(file, (err, data) => {
       err ? reject(err) : resolve(data);
@@ -24,6 +24,15 @@ const runPeriod = 30 * 1000;
 // Period of inactivity after which we drop the drawing from memory.
 const cleanupDelay = 5 * 60 * 1000;
 class Drawing {
+  loadPromise: any;
+  id: any;
+  image: any;
+  lastAccess: number;
+  edits: any[];
+  logicalTime: number;
+  waiters: any[];
+  lastSave: number;
+  runTimer: NodeJS.Timeout;
   constructor(id) {
     this.loadPromise = null;
     this.id = id;
@@ -114,7 +123,7 @@ class Drawing {
       let data;
       try {
         const name = 'images/' + id + '.json';
-        data = JSON.parse(await load(name));
+        data = await load(name);
         console.log('Reading ' + name);
         drawing.image = data.image;
         drawing.logicalTime = data.logicalTime;
@@ -186,7 +195,7 @@ async function wrap(f, id, data, response) {
     return await f(id, data, response);
   } catch (e) {
     console.error(e);
-    return error(response, 'text/plain', 'Something went wrong.');
+    return error(response, 'Something went wrong.');
   }
 }
 

@@ -119,7 +119,7 @@ class Drawing {
             let data;
             try {
                 const name = 'images/' + id + '.json';
-                data = JSON.parse(await load(name));
+                data = await load(name);
                 console.log('Reading ' + name);
                 drawing.image = data.image;
                 drawing.logicalTime = data.logicalTime;
@@ -185,7 +185,7 @@ async function wrap(f, id, data, response) {
     }
     catch (e) {
         console.error(e);
-        return error(response, 'text/plain', 'Something went wrong.');
+        return error(response, 'Something went wrong.');
     }
 }
 function body(request) {
