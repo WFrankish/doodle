@@ -1,5 +1,5 @@
-const fs = require('fs');
-const http = require('http');
+import fs = require('fs');
+import http = require('http');
 
 function load(file) {
   return new Promise((resolve, reject) => {

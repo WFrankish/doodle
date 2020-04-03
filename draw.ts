@@ -1,6 +1,6 @@
-const committedCanvas = document.getElementById('committed');
+const committedCanvas = document.getElementById('committed') as HTMLCanvasElement;
 const committedContext = committedCanvas.getContext('2d');
-const overlayCanvas = document.getElementById('overlay');
+const overlayCanvas = document.getElementById('overlay') as HTMLCanvasElement;
 const overlayContext = overlayCanvas.getContext('2d');
 
 const width = 1280;
@@ -53,7 +53,7 @@ function resize() {
 resize();
 addEventListener('resize', resize);
 
-function load(dataUri) {
+function load(dataUri): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image;
     image.addEventListener('load', () => resolve(image));

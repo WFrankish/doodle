@@ -1,5 +1,7 @@
-const fs = require('fs');
-const http = require('http');
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const fs = require("fs");
+const http = require("http");
 function load(file) {
     return new Promise((resolve, reject) => {
         fs.readFile(file, (err, data) => {
