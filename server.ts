@@ -202,6 +202,8 @@ async function main() {
   const indexPage = await load('index.html');
   const drawPage = await load('draw.html');
   const drawScript = await load('draw.js');
+  const drawSourceMap = await load('draw.js.map');
+  const drawSource = await load('draw.ts');
 
   const server = http.createServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost:8000');
@@ -209,6 +211,12 @@ async function main() {
     if (path == '/') return serve(response, 'text/html', indexPage);
     if (path == '/draw.js') {
       return serve(response, 'text/javascript', drawScript);
+    }
+    if (path == '/draw.js.map') {
+      return serve(response, 'application/octet-stream', drawSourceMap);
+    }
+    if (path == '/draw.ts') {
+      return serve(response, 'application/octet-stream', drawSource);
     }
     const pathParts = path.split('/');  // '/a/b' -> ['', 'a', 'b']
     pathParts.splice(0, 1);  // Remove the empty string.

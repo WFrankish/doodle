@@ -11,3 +11,4 @@ typescript 3.8.3 or later
 # typescript settings
 * module: commonjs - match what node.js does
 * target: esnext - do not attempt to compile to code compatible with older browsers
+* sourceMap: true - allow debugging with original code

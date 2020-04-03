@@ -233,3 +233,4 @@ async function updateCommitted() {
     }
 }
 updateCommitted();
+//# sourceMappingURL=draw.js.map
