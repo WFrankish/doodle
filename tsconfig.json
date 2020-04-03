@@ -2,6 +2,13 @@
   "compilerOptions": {
     "module": "commonjs",
     "target": "esnext",
-    "sourceMap": true
+    "sourceMap": true,
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+    "*": [
+        "node_modules/*"
+    ]
+}
   }
 }

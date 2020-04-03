@@ -1,3 +1,4 @@
+"use strict";
 const committedCanvas = document.getElementById('committed');
 const committedContext = committedCanvas.getContext('2d');
 const overlayCanvas = document.getElementById('overlay');
@@ -51,7 +52,7 @@ resize();
 addEventListener('resize', resize);
 function load(dataUri) {
     return new Promise((resolve, reject) => {
-        const image = new Image;
+        const image = new Image();
         image.addEventListener('load', () => resolve(image));
         image.src = dataUri;
     });
@@ -95,26 +96,26 @@ function move(x, y) {
     }
     position = newPosition;
 }
-addEventListener('mousedown', event => down(event.x, event.y));
-addEventListener('mouseup', event => held = false);
-addEventListener('mouseleave', event => held = false);
-addEventListener('mousemove', event => move(event.x, event.y));
-addEventListener('touchstart', event => {
+addEventListener('mousedown', (event) => down(event.x, event.y));
+addEventListener('mouseup', (event) => (held = false));
+addEventListener('mouseleave', (event) => (held = false));
+addEventListener('mousemove', (event) => move(event.x, event.y));
+addEventListener('touchstart', (event) => {
     event.preventDefault();
     if (event.touches.length != 1)
         return;
     const touch = event.touches[0];
     down(touch.pageX, touch.pageY);
 });
-addEventListener('touchend', event => {
+addEventListener('touchend', (event) => {
     if (event.touches.length == 0)
         held = false;
 });
-addEventListener('touchcancel', event => {
+addEventListener('touchcancel', (event) => {
     if (event.touches.length == 0)
         held = false;
 });
-addEventListener('touchmove', event => {
+addEventListener('touchmove', (event) => {
     event.preventDefault();
     if (event.touches.length != 1)
         return;
@@ -149,7 +150,7 @@ async function deliverEdits() {
             sendInterval = defaultSendInterval;
         }
         catch (error) {
-            console.log("Delivery failed. Backing off.");
+            console.log('Delivery failed. Backing off.');
             sendInterval *= 2;
         }
     }
@@ -157,7 +158,7 @@ async function deliverEdits() {
 deliverEdits();
 // Code for rendering the overlay canvas.
 function animationFrame() {
-    return new Promise((resolve, reject) => requestAnimationFrame(resolve));
+    return new Promise((resolve) => requestAnimationFrame(resolve));
 }
 function drawCursor(context) {
     context.beginPath();
@@ -184,7 +185,7 @@ drawOverlay();
 // Code for updating the committed data canvas.
 async function readSnapshot() {
     const response = await fetch(location + '/snapshot');
-    const { logicalTime, imageData } = await response.json();
+    const { logicalTime, imageData } = (await response.json());
     return { logicalTime, image: await load(imageData) };
 }
 async function readUpdates(from) {
@@ -204,7 +205,10 @@ async function sendSnapshot(logicalTime) {
     console.log('Submitting snapshot for %d.', logicalTime);
     const response = await fetch(location + '/commit', {
         method: 'POST',
-        body: JSON.stringify({ logicalTime, imageData: committedCanvas.toDataURL() }),
+        body: JSON.stringify({
+            logicalTime,
+            imageData: committedCanvas.toDataURL(),
+        }),
     });
 }
 async function updateCommitted() {

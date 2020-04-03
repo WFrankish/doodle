@@ -1,7 +1,26 @@
-const committedCanvas = document.getElementById('committed') as HTMLCanvasElement;
-const committedContext = committedCanvas.getContext('2d');
+type Dimension = {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+};
+
+type PendingEdit = {
+  logicalTime: number;
+  edits: Edit[];
+};
+
+type Image = {
+  logicalTime: number;
+  image: HTMLImageElement;
+};
+
+const committedCanvas = document.getElementById(
+  'committed'
+) as HTMLCanvasElement;
+const committedContext = committedCanvas.getContext('2d')!;
 const overlayCanvas = document.getElementById('overlay') as HTMLCanvasElement;
-const overlayContext = overlayCanvas.getContext('2d');
+const overlayContext = overlayCanvas.getContext('2d')!;
 
 const width = 1280;
 const height = 1024;
@@ -11,15 +30,15 @@ committedCanvas.height = height;
 overlayCanvas.width = width;
 overlayCanvas.height = height;
 
-function setCanvas(canvas, dimensions) {
+function setCanvas(canvas: HTMLCanvasElement, dimensions: Dimension): void {
   canvas.style.top = dimensions.top + 'px';
   canvas.style.left = dimensions.left + 'px';
   canvas.style.width = dimensions.width + 'px';
   canvas.style.height = dimensions.height + 'px';
 }
 
-const display = {top: 0, left: 0};
-function setDisplay(dimensions) {
+const display = { top: 0, left: 0 };
+function setDisplay(dimensions: Dimension): void {
   display.top = dimensions.top;
   display.left = dimensions.left;
   setCanvas(committedCanvas, dimensions);
@@ -27,11 +46,11 @@ function setDisplay(dimensions) {
 }
 
 // Resize the display dimensions of the canvas whenever the window changes size.
-function resize() {
+function resize(): void {
   const aspect = width / height;
   const actualAspect = innerWidth / innerHeight;
   if (aspect < actualAspect) {
-    console.log('wide')
+    console.log('wide');
     scale = innerHeight / height;
     setDisplay({
       top: 0,
@@ -53,15 +72,15 @@ function resize() {
 resize();
 addEventListener('resize', resize);
 
-function load(dataUri): Promise<HTMLImageElement> {
+function load(dataUri: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
-    const image = new Image;
+    const image = new Image();
     image.addEventListener('load', () => resolve(image));
     image.src = dataUri;
   });
 }
 
-function draw(context, edits) {
+function draw(context: CanvasRenderingContext2D, edits: Edit[]): void {
   context.lineCap = 'round';
   for (const edit of edits) {
     context.beginPath();
@@ -74,17 +93,17 @@ function draw(context, edits) {
 }
 
 // Code for handling user inputs.
-function randomColor() {
+function randomColor(): string {
   const value = Math.floor(Math.random() * 256 * 256 * 256);
   return '#' + value.toString(16).padStart(6, '0');
 }
 let color = randomColor();
 let size = 10;
 let held = false;
-let pendingEdits = [];  // Edits which have been sent but not received.
-let newEdits = [];  // Edits which have not been sent.
+let pendingEdits: PendingEdit[] = []; // Edits which have been sent but not received.
+let newEdits: Edit[] = []; // Edits which have not been sent.
 let position = [0, 0];
-function down(x, y) {
+function down(x: number, y: number): void {
   position = [(x - display.left) / scale, (y - display.top) / scale];
   held = true;
   newEdits.push({
@@ -94,31 +113,31 @@ function down(x, y) {
     size,
   });
 }
-function move(x, y) {
+function move(x: number, y: number): void {
   const newPosition = [(x - display.left) / scale, (y - display.top) / scale];
   if (held) {
-    newEdits.push({from: position, to: newPosition, color, size});
+    newEdits.push({ from: position, to: newPosition, color, size });
   }
   position = newPosition;
 }
-addEventListener('mousedown', event => down(event.x, event.y));
-addEventListener('mouseup', event => held = false);
-addEventListener('mouseleave', event => held = false);
-addEventListener('mousemove', event => move(event.x, event.y));
+addEventListener('mousedown', (event) => down(event.x, event.y));
+addEventListener('mouseup', (event) => (held = false));
+addEventListener('mouseleave', (event) => (held = false));
+addEventListener('mousemove', (event) => move(event.x, event.y));
 
-addEventListener('touchstart', event => {
+addEventListener('touchstart', (event) => {
   event.preventDefault();
   if (event.touches.length != 1) return;
   const touch = event.touches[0];
   down(touch.pageX, touch.pageY);
 });
-addEventListener('touchend', event => {
+addEventListener('touchend', (event) => {
   if (event.touches.length == 0) held = false;
 });
-addEventListener('touchcancel', event => {
+addEventListener('touchcancel', (event) => {
   if (event.touches.length == 0) held = false;
 });
-addEventListener('touchmove', event => {
+addEventListener('touchmove', (event) => {
   event.preventDefault();
   if (event.touches.length != 1) return;
   const touch = event.touches[0];
@@ -126,17 +145,17 @@ addEventListener('touchmove', event => {
 });
 
 // Code for delivering edits.
-function delay(ms) {
+function delay(ms: number): Promise<void> {
   return new Promise((resolve, reject) => setTimeout(resolve, ms));
 }
-async function sendEdits(edits) {
+async function sendEdits(edits: Edit[]): Promise<ImageMessage> {
   const response = await fetch(location + '/draw', {
     method: 'POST',
     body: JSON.stringify(edits),
   });
   return await response.json();
 }
-async function deliverEdits() {
+async function deliverEdits(): Promise<void> {
   let nextStart = Date.now();
   const defaultSendInterval = 100;
   let sendInterval = defaultSendInterval;
@@ -147,11 +166,11 @@ async function deliverEdits() {
     try {
       const toSend = newEdits;
       newEdits = [];
-      const {logicalTime} = await sendEdits(toSend);
-      pendingEdits.push({logicalTime, edits: toSend});
+      const { logicalTime } = await sendEdits(toSend);
+      pendingEdits.push({ logicalTime, edits: toSend });
       sendInterval = defaultSendInterval;
     } catch (error) {
-      console.log("Delivery failed. Backing off.");
+      console.log('Delivery failed. Backing off.');
       sendInterval *= 2;
     }
   }
@@ -159,10 +178,10 @@ async function deliverEdits() {
 deliverEdits();
 
 // Code for rendering the overlay canvas.
-function animationFrame() {
-  return new Promise((resolve, reject) => requestAnimationFrame(resolve));
+function animationFrame(): Promise<number> {
+  return new Promise((resolve) => requestAnimationFrame(resolve));
 }
-function drawCursor(context) {
+function drawCursor(context: CanvasRenderingContext2D): void {
   context.beginPath();
   context.lineCap = 'round';
   context.strokeStyle = color;
@@ -172,7 +191,7 @@ function drawCursor(context) {
   context.lineTo(position[0] + 0.5, position[1]);
   context.stroke();
 }
-async function drawOverlay() {
+async function drawOverlay(): Promise<void> {
   while (true) {
     await animationFrame();
     overlayContext.clearRect(0, 0, width, height);
@@ -186,37 +205,41 @@ async function drawOverlay() {
 drawOverlay();
 
 // Code for updating the committed data canvas.
-async function readSnapshot() {
+async function readSnapshot(): Promise<Image> {
   const response = await fetch(location + '/snapshot');
-  const {logicalTime, imageData} = await response.json();
-  return {logicalTime, image: await load(imageData)};
+  const { logicalTime, imageData } = (await response.json()) as ImageMessage;
+  return { logicalTime, image: await load(imageData) };
 }
 
-async function readUpdates(from) {
+async function readUpdates(from: number): Promise<Edit[]> {
   const response = await fetch(location + '/read', {
     method: 'POST',
-    body: JSON.stringify({from}),
+    body: JSON.stringify({ from }),
   });
   return await response.json();
 }
 
 const snapshotPeriod = 1000;
 const snapshotParity = Math.floor(snapshotPeriod * Math.random());
-function nextSnapshot(time) {
-  const cycle =
-      Math.floor((time - snapshotParity + snapshotPeriod - 1) / snapshotPeriod);
+function nextSnapshot(time: number): number {
+  const cycle = Math.floor(
+    (time - snapshotParity + snapshotPeriod - 1) / snapshotPeriod
+  );
   return cycle * snapshotPeriod + snapshotParity;
 }
 
-async function sendSnapshot(logicalTime) {
+async function sendSnapshot(logicalTime: number): Promise<void> {
   console.log('Submitting snapshot for %d.', logicalTime);
   const response = await fetch(location + '/commit', {
     method: 'POST',
-    body: JSON.stringify({logicalTime, imageData: committedCanvas.toDataURL()}),
+    body: JSON.stringify({
+      logicalTime,
+      imageData: committedCanvas.toDataURL(),
+    } as ImageMessage),
   });
 }
 
-async function updateCommitted() {
+async function updateCommitted(): Promise<void> {
   let logicalTime = 0;
   while (true) {
     try {
@@ -226,8 +249,10 @@ async function updateCommitted() {
       logicalTime += edits.length;
       if (logicalTime >= nextSnapshotAfter) sendSnapshot(logicalTime);
       // Remove pending edits which have arrived.
-      while (pendingEdits.length > 0 &&
-             pendingEdits[0].logicalTime < logicalTime) {
+      while (
+        pendingEdits.length > 0 &&
+        pendingEdits[0].logicalTime < logicalTime
+      ) {
         pendingEdits.shift();
       }
     } catch (error) {

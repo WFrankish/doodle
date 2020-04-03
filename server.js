@@ -11,12 +11,12 @@ function load(file) {
 }
 function save(file, data) {
     return new Promise((resolve, reject) => {
-        fs.writeFile(file, data, 'utf8', err => {
+        fs.writeFile(file, data, 'utf8', (err) => {
             err ? reject(err) : resolve();
         });
     });
 }
-const drawings = new Map;
+const drawings = new Map();
 // Period at which we run cleanup work for the drawing. This includes culling
 // open connections and saving the contents.
 const runPeriod = 30 * 1000;
@@ -56,7 +56,9 @@ class Drawing {
             }
         }
     }
-    snapshotTime() { return this.logicalTime - this.edits.length; }
+    snapshotTime() {
+        return this.logicalTime - this.edits.length;
+    }
     apply(edits) {
         if (edits.length == 0)
             throw new Error('Must append at least one thing.');
@@ -77,7 +79,7 @@ class Drawing {
     async updates(logicalTime) {
         this.lastAccess = Date.now();
         if (logicalTime < this.snapshotTime()) {
-            throw new Error("Cannot deliver updates before the snapshot.");
+            throw new Error('Cannot deliver updates before the snapshot.');
         }
         if (logicalTime == this.logicalTime)
             await this.anyUpdates();
@@ -119,7 +121,7 @@ class Drawing {
             let data;
             try {
                 const name = 'images/' + id + '.json';
-                data = await load(name);
+                data = JSON.parse(await load(name)); // why does this work?
                 console.log('Reading ' + name);
                 drawing.image = data.image;
                 drawing.logicalTime = data.logicalTime;
@@ -147,7 +149,9 @@ function serve(response, contentType, data) {
 function error(response, message) {
     respond(response, 404, 'text/plain', message);
 }
-async function get(id) { return await Drawing.load(id); }
+async function get(id) {
+    return await Drawing.load(id);
+}
 async function commit(id, data, response) {
     const { logicalTime, imageData } = JSON.parse(data);
     const drawing = await get(id);
@@ -191,7 +195,7 @@ async function wrap(f, id, data, response) {
 function body(request) {
     return new Promise((resolve, reject) => {
         const body = [];
-        request.on('data', chunk => body.push(chunk));
+        request.on('data', (chunk) => body.push(chunk));
         request.on('end', () => resolve(Buffer.concat(body).toString()));
     });
 }
@@ -224,13 +228,13 @@ async function main() {
         else if (pathParts.length == 2) {
             const data = await body(request);
             switch (pathParts[1]) {
-                case "commit":
+                case 'commit':
                     return wrap(commit, id, data, response);
-                case "draw":
+                case 'draw':
                     return wrap(draw, id, data, response);
-                case "read":
+                case 'read':
                     return wrap(read, id, data, response);
-                case "snapshot":
+                case 'snapshot':
                     return wrap(snapshot, id, data, response);
                 default:
                     return error(response, 'Invalid operation.');
